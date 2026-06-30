@@ -1,0 +1,51 @@
+name: SHP20 regress check
+
+on:
+  schedule:
+    - cron: '0 7 * * *'
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+  issues: write
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Detect regress signal in shp20-releases
+        id: detect
+        env:
+          SLACK_BOT_TOKEN: ${{ secrets.SLACK_BOT_TOKEN }}
+        run: |
+          set -euo pipefail
+          OLDEST=$(date -d '24 hours ago' +%s)
+          RESP=$(curl -s -H "Authorization: Bearer $SLACK_BOT_TOKEN" \
+            "https://slack.com/api/conversations.history?channel=C026KBTS35F&oldest=${OLDEST}&limit=200")
+          OK=$(echo "$RESP" | jq -r '.ok')
+          if [ "$OK" != "true" ]; then
+            echo "Slack API error: $(echo "$RESP" | jq -r '.error // "unknown"')" >&2
+            exit 1
+          fi
+          HIT=$(echo "$RESP" | jq -r --arg u "U0369MCLT0X" '
+            [ .messages[]?
+              | select(.user == $u)
+              | select((.text // "" | ascii_downcase) | contains("please start regress to rc")) ]
+            | length')
+          echo "hit=$HIT" >> "$GITHUB_OUTPUT"
+          if [ "$HIT" -gt 0 ]; then
+            echo "Сигнал ЗНАЙДЕНО ($HIT)."
+          else
+            echo "Сигналу немає за останні 24 години."
+          fi
+
+      - name: Open issue if regress is needed
+        if: steps.detect.outputs.hit != '0'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh issue create \
+            --repo "$GITHUB_REPOSITORY" \
+            --title "Сьогодні потрібен регрес ($(date +%Y-%m-%d))" \
+            --body "Сигнал 'please start regress to RC' від Oleksandr Kolyada зʼявився у shp20-releases за останні 24 години." \
+            --assignee yevhenhlovatskyi05
