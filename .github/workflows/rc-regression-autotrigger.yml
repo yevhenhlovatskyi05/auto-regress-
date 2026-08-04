@@ -109,8 +109,10 @@ jobs:
       - name: Update STATUS.md
         if: always() && steps.gate.outputs.skip != 'true'
         run: |
-          DATE=$(date -u '+%Y-%m-%d')
-          TIME=$(date -u '+%H:%M:%S')
+          NOW_EPOCH=$(date +%s)
+          DATE=$(date -u -d "@${NOW_EPOCH}" '+%Y-%m-%d')
+          TIME=$(date -u -d "@${NOW_EPOCH}" '+%H:%M:%S')
+          KYIV_TIME=$(TZ='Europe/Kyiv' date -d "@${NOW_EPOCH}" '+%H:%M:%S')
           FOUND="${{ steps.check.outputs.found }}"
           TEXT="${{ steps.check.outputs.matched_text }}"
           # Прибираємо переноси рядків і escape'имо "|", щоб не зламати markdown-таблицю
@@ -120,12 +122,12 @@ jobs:
             {
               echo "# RC Regression Autotrigger — Status"
               echo ""
-              echo "| Дата | Час (UTC) | Команду знайдено | Текст повідомлення |"
-              echo "|---|---|---|---|"
+              echo "| Дата | Час (UTC) | Час (Kyiv) | Команду знайдено | Текст повідомлення |"
+              echo "|---|---|---|---|---|"
             } > STATUS.md
           fi
 
-          echo "| ${DATE} | ${TIME} | ${FOUND} | ${TEXT} |" >> STATUS.md
+          echo "| ${DATE} | ${TIME} | ${KYIV_TIME} | ${FOUND} | ${TEXT} |" >> STATUS.md
 
       - name: Commit and push STATUS.md
         if: always() && steps.gate.outputs.skip != 'true'
