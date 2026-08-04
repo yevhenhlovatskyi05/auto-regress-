@@ -26,7 +26,7 @@ jobs:
         env:
           SLACK_BOT_TOKEN: ${{ secrets.SLACK_BOT_TOKEN }}
         run: |
-          CHANNEL_ID="REPLACE_WITH_CHANNEL_ID"
+          CHANNEL_ID="C026KBTS35F"
           OLDEST=$(( $(date +%s) - 86400 ))
 
           RESPONSE=$(curl -s -H "Authorization: Bearer $SLACK_BOT_TOKEN" \
@@ -41,7 +41,7 @@ jobs:
           fi
 
           # Заміни ключові фрази на ті, що реально пишуть у вашому каналі
-          KEYWORDS=("RC ready" "released to RC" "release to RC" "RC release")
+          KEYWORDS=(@Eugene Glovatskiy  please start regress to RC)
           FOUND="false"
           MATCHED_TEXT=""
 
@@ -69,20 +69,6 @@ jobs:
           # npx playwright test --grep @regression
           echo "REPLACE_WITH_YOUR_TEST_COMMAND"
 
-      - name: Notify Slack about run
-        if: always() && steps.check.outputs.found == 'true'
-        env:
-          SLACK_BOT_TOKEN: ${{ secrets.SLACK_BOT_TOKEN }}
-        run: |
-          STATUS_TEXT="✅ Regression autotests triggered"
-          RUN_URL="${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
-          curl -s -X POST https://slack.com/api/chat.postMessage \
-            -H "Authorization: Bearer $SLACK_BOT_TOKEN" \
-            -H "Content-Type: application/json" \
-            -d "$(jq -n \
-                  --arg channel "REPLACE_WITH_CHANNEL_ID" \
-                  --arg text "$STATUS_TEXT at $(date -u '+%Y-%m-%d %H:%M UTC') based on: ${{ steps.check.outputs.matched_text }} — $RUN_URL" \
-                  '{channel: $channel, text: $text}')"
 
       - name: Write run summary
         if: always()
