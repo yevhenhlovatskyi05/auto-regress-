@@ -1,0 +1,96 @@
+name: RC Regression Autotrigger
+
+# Весь флоу живе тут, у Git:
+# - schedule сам тригерить перевірку Slack
+# - якщо знайдено релізне повідомлення за останні 24г - запускаються тести
+# - результат видно в Actions -> цей workflow -> кожен run має точний час і статус (✅/❌)
+#   плюс у Summary кожного run буде час перевірки, знайдено чи ні, і текст повідомлення
+
+on:
+  schedule:
+    # 07:00 UTC = 09:00 Kyiv (зимовий час, UTC+2) / 10:00 Kyiv (літній час, UTC+3)
+    # GitHub Actions cron завжди в UTC, DST не враховує - за потреби зроби 2 cron-рядки
+    # на зимовий і літній час, або зсунь час і прийми похибку в 1 годину влітку
+    - cron: '0 7 * * 1-5'
+  workflow_dispatch: {}   # можливість запустити вручну для перевірки
+
+jobs:
+  check-and-run:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Check Slack release channel
+        id: check
+        env:
+          SLACK_BOT_TOKEN: ${{ secrets.SLACK_BOT_TOKEN }}
+        run: |
+          CHANNEL_ID="REPLACE_WITH_CHANNEL_ID"
+          OLDEST=$(( $(date +%s) - 86400 ))
+
+          RESPONSE=$(curl -s -H "Authorization: Bearer $SLACK_BOT_TOKEN" \
+            "https://slack.com/api/conversations.history?channel=${CHANNEL_ID}&oldest=${OLDEST}")
+
+          OK=$(echo "$RESPONSE" | jq -r '.ok')
+          if [ "$OK" != "true" ]; then
+            echo "Slack API error: $(echo "$RESPONSE" | jq -r '.error')"
+            echo "found=false" >> "$GITHUB_OUTPUT"
+            echo "matched_text=" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          # Заміни ключові фрази на ті, що реально пишуть у вашому каналі
+          KEYWORDS=("RC ready" "released to RC" "release to RC" "RC release")
+          FOUND="false"
+          MATCHED_TEXT=""
+
+          while IFS= read -r TEXT; do
+            LOWER_TEXT=$(echo "$TEXT" | tr '[:upper:]' '[:lower:]')
+            for KW in "${KEYWORDS[@]}"; do
+              LOWER_KW=$(echo "$KW" | tr '[:upper:]' '[:lower:]')
+              if [[ "$LOWER_TEXT" == *"$LOWER_KW"* ]]; then
+                FOUND="true"
+                MATCHED_TEXT="$TEXT"
+                break 2
+              fi
+            done
+          done < <(echo "$RESPONSE" | jq -r '.messages[].text // ""')
+
+          echo "found=$FOUND" >> "$GITHUB_OUTPUT"
+          echo "matched_text=$MATCHED_TEXT" >> "$GITHUB_OUTPUT"
+
+      - name: Run regression autotests
+        if: steps.check.outputs.found == 'true'
+        run: |
+          # ЗАМІНИ на реальну команду запуску regression-автотестів, напр.:
+          # pytest tests/regression --env=rc
+          # mvn -Dtest=RegressionSuite test
+          # npx playwright test --grep @regression
+          echo "REPLACE_WITH_YOUR_TEST_COMMAND"
+
+      - name: Notify Slack about run
+        if: always() && steps.check.outputs.found == 'true'
+        env:
+          SLACK_BOT_TOKEN: ${{ secrets.SLACK_BOT_TOKEN }}
+        run: |
+          STATUS_TEXT="✅ Regression autotests triggered"
+          RUN_URL="${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+          curl -s -X POST https://slack.com/api/chat.postMessage \
+            -H "Authorization: Bearer $SLACK_BOT_TOKEN" \
+            -H "Content-Type: application/json" \
+            -d "$(jq -n \
+                  --arg channel "REPLACE_WITH_CHANNEL_ID" \
+                  --arg text "$STATUS_TEXT at $(date -u '+%Y-%m-%d %H:%M UTC') based on: ${{ steps.check.outputs.matched_text }} — $RUN_URL" \
+                  '{channel: $channel, text: $text}')"
+
+      - name: Write run summary
+        if: always()
+        run: |
+          echo "### RC Regression Autotrigger" >> "$GITHUB_STEP_SUMMARY"
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          echo "| Поле | Значення |" >> "$GITHUB_STEP_SUMMARY"
+          echo "|---|---|" >> "$GITHUB_STEP_SUMMARY"
+          echo "| Час перевірки (UTC) | $(date -u '+%Y-%m-%d %H:%M:%S') |" >> "$GITHUB_STEP_SUMMARY"
+          echo "| Релізне повідомлення знайдено | ${{ steps.check.outputs.found }} |" >> "$GITHUB_STEP_SUMMARY"
+          echo "| Текст повідомлення | ${{ steps.check.outputs.matched_text }} |" >> "$GITHUB_STEP_SUMMARY"
