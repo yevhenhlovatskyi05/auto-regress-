@@ -27,10 +27,12 @@ jobs:
           SLACK_BOT_TOKEN: ${{ secrets.SLACK_BOT_TOKEN }}
         run: |
           CHANNEL_ID="C026KBTS35F"
-          OLDEST=$(( $(date +%s) - 86400 ))
+          # ТИМЧАСОВО: перевірка повідомлень за конкретну дату (30.07.2026) замість останніх 24г
+          OLDEST=$(date -u -d '2026-07-30 00:00:00' +%s)
+          LATEST=$(date -u -d '2026-07-31 00:00:00' +%s)
 
           RESPONSE=$(curl -s -H "Authorization: Bearer $SLACK_BOT_TOKEN" \
-            "https://slack.com/api/conversations.history?channel=${CHANNEL_ID}&oldest=${OLDEST}")
+            "https://slack.com/api/conversations.history?channel=${CHANNEL_ID}&oldest=${OLDEST}&latest=${LATEST}")
 
           OK=$(echo "$RESPONSE" | jq -r '.ok')
           if [ "$OK" != "true" ]; then
