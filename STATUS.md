@@ -9,4 +9,4 @@
 
 | |
 |---:|
-| ![Run autotest](https://img.shields.io/badge/Run%20autotest-lightgrey?style=flat) |
+| **[Run autotest](https://github.com/yevhenhlovatskyi05/auto-regress-/actions/workflows/rc-regression-autotrigger.yml)** |
