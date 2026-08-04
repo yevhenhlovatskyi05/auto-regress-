@@ -9,4 +9,4 @@
 
 | |
 |---:|
-| **[Run autotest](https://github.com/yevhenhlovatskyi05/auto-regress-/actions/workflows/rc-regression-autotrigger.yml)** |
+| `Run autotest` |
