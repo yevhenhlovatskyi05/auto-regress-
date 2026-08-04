@@ -139,9 +139,12 @@ jobs:
             echo "| Автотести | не запускались (Slack-повідомлення не знайдено і запуск не ручний) |" >> "$GITHUB_STEP_SUMMARY"
           fi
 
-      - name: Update STATUS.md
+      - name: Update STATUS.md and push
         if: always() && steps.gate.outputs.skip != 'true'
         run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
           NOW_EPOCH=$(date +%s)
           DATE=$(date -u -d "@${NOW_EPOCH}" '+%Y-%m-%d')
           KYIV_TIME=$(TZ='Europe/Kyiv' date -d "@${NOW_EPOCH}" '+%H:%M:%S')
@@ -149,58 +152,73 @@ jobs:
           TEXT="${{ steps.check.outputs.matched_text }}"
           # Прибираємо переноси рядків і escape'имо "|", щоб не зламати markdown-таблицю
           TEXT=$(echo "$TEXT" | tr '\n' ' ' | sed 's/|/\\|/g')
+          AUTOTEST_STATUS="${{ steps.autotests.outputs.status }}"
+          AUTOTEST_SUMMARY="${{ steps.autotests.outputs.summary }}"
+          RUN_URL="${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
 
           BUTTON='[![Run autotest](data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIxMzAiIGhlaWdodD0iMzIiIHZpZXdCb3g9IjAgMCAxMzAgMzIiPgogIDxyZWN0IHdpZHRoPSIxMzAiIGhlaWdodD0iMzIiIHJ4PSI0IiBmaWxsPSIjMDBCRDZFIi8+CiAgPHRleHQgeD0iNjUiIHk9IjIwIiBmb250LWZhbWlseT0iUm9ib3RvLCBBcmlhbCwgc2Fucy1zZXJpZiIgZm9udC1zaXplPSIxNCIgZmlsbD0iI0ZGRkZGRiIgdGV4dC1hbmNob3I9Im1pZGRsZSI+UnVuIGF1dG90ZXN0PC90ZXh0Pgo8L3N2Zz4K)](https://github.com/yevhenhlovatskyi05/auto-regress-/actions/workflows/rc-regression-autotrigger.yml)'
 
-          if [ ! -f STATUS.md ]; then
-            {
-              echo "# RC Regression Autotrigger — Status"
-              echo ""
-              echo "| № | Дата | Час (Kyiv) | Команду знайдено | Текст повідомлення |"
-              echo "|---|---|---|---|---|"
-              echo "| 1 | ${DATE} | ${KYIV_TIME} | ${FOUND} | ${TEXT} |"
-              echo ""
-              echo "$BUTTON"
-            } > STATUS.md
-          else
-            LAST_LINE=$(grep -n '^| [0-9][0-9]* |' STATUS.md | tail -1 | cut -d: -f1 || true)
-            LAST_NUM=$(grep -n '^| [0-9][0-9]* |' STATUS.md | tail -1 | sed -E 's/^[0-9]+:\| *([0-9]+) .*/\1/' || true)
-            NEXT=$(( ${LAST_NUM:-0} + 1 ))
-            NEW_ROW="| ${NEXT} | ${DATE} | ${KYIV_TIME} | ${FOUND} | ${TEXT} |"
-            awk -v line="${LAST_LINE:-0}" -v newrow="$NEW_ROW" 'NR==line{print; print newrow; next}{print}' STATUS.md > STATUS.md.tmp
-            mv STATUS.md.tmp STATUS.md
-          fi
+          # Кілька спроб: інший (або попередній re-run цього ж) workflow-запуск міг
+          # уже запушити свій коміт у main, поки цей job працював - тоді звичайний
+          # push відхилиться як non-fast-forward. Щоразу підтягуємо свіжий main і
+          # рахуємо номер рядка/розділ автотестів заново з нього.
+          PUSHED=false
+          for ATTEMPT in 1 2 3 4 5; do
+            git fetch origin main
+            git reset --hard origin/main
 
-          # Звіт по автотестах (перезаписується щоразу, коли тести реально запускались)
-          AUTOTEST_STATUS="${{ steps.autotests.outputs.status }}"
-          if [ -n "$AUTOTEST_STATUS" ]; then
-            AUTOTEST_SUMMARY="${{ steps.autotests.outputs.summary }}"
-            RUN_URL="${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
-
-            if grep -q '^## Останній запуск автотестів$' STATUS.md; then
-              sed -i '/^## Останній запуск автотестів$/,$d' STATUS.md
+            if [ ! -f STATUS.md ]; then
+              {
+                echo "# RC Regression Autotrigger — Status"
+                echo ""
+                echo "| № | Дата | Час (Kyiv) | Команду знайдено | Текст повідомлення |"
+                echo "|---|---|---|---|---|"
+                echo "| 1 | ${DATE} | ${KYIV_TIME} | ${FOUND} | ${TEXT} |"
+                echo ""
+                echo "$BUTTON"
+              } > STATUS.md
+            else
+              LAST_LINE=$(grep -n '^| [0-9][0-9]* |' STATUS.md | tail -1 | cut -d: -f1 || true)
+              LAST_NUM=$(grep -n '^| [0-9][0-9]* |' STATUS.md | tail -1 | sed -E 's/^[0-9]+:\| *([0-9]+) .*/\1/' || true)
+              NEXT=$(( ${LAST_NUM:-0} + 1 ))
+              NEW_ROW="| ${NEXT} | ${DATE} | ${KYIV_TIME} | ${FOUND} | ${TEXT} |"
+              awk -v line="${LAST_LINE:-0}" -v newrow="$NEW_ROW" 'NR==line{print; print newrow; next}{print}' STATUS.md > STATUS.md.tmp
+              mv STATUS.md.tmp STATUS.md
             fi
 
-            {
-              echo ""
-              echo "## Останній запуск автотестів"
-              echo ""
-              echo "- Статус: ${AUTOTEST_STATUS}"
-              echo "- Час: ${DATE} ${KYIV_TIME} (Kyiv)"
-              echo "- Підсумок: ${AUTOTEST_SUMMARY}"
-              echo "- [Повний лог запуску](${RUN_URL})"
-            } >> STATUS.md
-          fi
+            if [ -n "$AUTOTEST_STATUS" ]; then
+              if grep -q '^## Останній запуск автотестів$' STATUS.md; then
+                sed -i '/^## Останній запуск автотестів$/,$d' STATUS.md
+              fi
+              {
+                echo ""
+                echo "## Останній запуск автотестів"
+                echo ""
+                echo "- Статус: ${AUTOTEST_STATUS}"
+                echo "- Час: ${DATE} ${KYIV_TIME} (Kyiv)"
+                echo "- Підсумок: ${AUTOTEST_SUMMARY}"
+                echo "- [Повний лог запуску](${RUN_URL})"
+              } >> STATUS.md
+            fi
 
-      - name: Commit and push STATUS.md
-        if: always() && steps.gate.outputs.skip != 'true'
-        run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add STATUS.md
-          if git diff --cached --quiet; then
-            echo "Немає змін у STATUS.md"
-          else
+            git add STATUS.md
+            if git diff --cached --quiet; then
+              echo "Немає змін у STATUS.md"
+              PUSHED=true
+              break
+            fi
+
             git commit -m "Update STATUS.md after regression check run"
-            git push origin HEAD:main
+            if git push origin HEAD:main; then
+              PUSHED=true
+              break
+            fi
+
+            echo "Push відхилено (спроба ${ATTEMPT}), пробуємо ще раз..."
+            sleep $(( (RANDOM % 3) + 1 ))
+          done
+
+          if [ "$PUSHED" != "true" ]; then
+            echo "Не вдалося запушити STATUS.md після кількох спроб" >&2
+            exit 1
           fi
