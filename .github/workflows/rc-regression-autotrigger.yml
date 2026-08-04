@@ -27,12 +27,10 @@ jobs:
           SLACK_BOT_TOKEN: ${{ secrets.SLACK_BOT_TOKEN }}
         run: |
           CHANNEL_ID="C026KBTS35F"
-          # ТИМЧАСОВО: перевірка повідомлень за конкретну дату (30.07.2026) замість останніх 24г
-          OLDEST=$(date -u -d '2026-07-30 00:00:00' +%s)
-          LATEST=$(date -u -d '2026-07-31 00:00:00' +%s)
+          OLDEST=$(( $(date +%s) - 86400 ))
 
           RESPONSE=$(curl -s -H "Authorization: Bearer $SLACK_BOT_TOKEN" \
-            "https://slack.com/api/conversations.history?channel=${CHANNEL_ID}&oldest=${OLDEST}&latest=${LATEST}")
+            "https://slack.com/api/conversations.history?channel=${CHANNEL_ID}&oldest=${OLDEST}")
 
           OK=$(echo "$RESPONSE" | jq -r '.ok')
           if [ "$OK" != "true" ]; then
@@ -42,8 +40,7 @@ jobs:
             exit 0
           fi
 
-          # Заміни ключові фрази на ті, що реально пишуть у вашому каналі
-          KEYWORDS=(@Eugene Glovatskiy  please start regress to RC)
+          KEYWORDS=("start regress to RC")
           FOUND="false"
           MATCHED_TEXT=""
 
