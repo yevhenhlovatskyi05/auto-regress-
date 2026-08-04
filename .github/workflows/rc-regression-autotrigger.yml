@@ -27,6 +27,11 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
       - name: Skip if not the active Kyiv schedule
         id: gate
         run: |
@@ -88,12 +93,13 @@ jobs:
 
       - name: Run regression autotests
         if: steps.gate.outputs.skip != 'true' && steps.check.outputs.found == 'true'
+        env:
+          RC_BASIC_AUTH_USER: ${{ secrets.RC_BASIC_AUTH_USER }}
+          RC_BASIC_AUTH_PASS: ${{ secrets.RC_BASIC_AUTH_PASS }}
         run: |
-          # ЗАМІНИ на реальну команду запуску regression-автотестів, напр.:
-          # pytest tests/regression --env=rc
-          # mvn -Dtest=RegressionSuite test
-          # npx playwright test --grep @regression
-          echo "REPLACE_WITH_YOUR_TEST_COMMAND"
+          pip install -r requirements.txt
+          playwright install --with-deps chromium
+          pytest tests/test_track_order.py -v
 
       - name: Write run summary
         if: always() && steps.gate.outputs.skip != 'true'
