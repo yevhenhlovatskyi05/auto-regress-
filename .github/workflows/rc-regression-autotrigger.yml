@@ -5,14 +5,20 @@ name: RC Regression Autotrigger
 # - якщо знайдено релізне повідомлення за останні 24г - запускаються тести
 # - результат видно в Actions -> цей workflow -> кожен run має точний час і статус (✅/❌)
 #   плюс у Summary кожного run буде час перевірки, знайдено чи ні, і текст повідомлення
+# - результат кожного run також дописується рядком в STATUS.md (в main)
 
 on:
   schedule:
-    # 07:00 UTC = 09:00 Kyiv (зимовий час, UTC+2) / 10:00 Kyiv (літній час, UTC+3)
-    # GitHub Actions cron завжди в UTC, DST не враховує - за потреби зроби 2 cron-рядки
-    # на зимовий і літній час, або зсунь час і прийми похибку в 1 годину влітку
-    - cron: '0 7 * * 1-5'
+    # Ціль - 10:00 за Києвом. GitHub Actions cron рахує тільки в UTC і не знає про
+    # перехід на літній/зимовий час, тому нижче два cron-рядки (на обидва зсуви),
+    # а крок "Skip if not the active Kyiv schedule" відкидає той запуск, який
+    # не відповідає поточному київському часу, щоб job не виконувався двічі на день.
+    - cron: '0 7 * * 1-5'   # 10:00 Kyiv влітку (UTC+3)
+    - cron: '0 8 * * 1-5'   # 10:00 Kyiv взимку (UTC+2)
   workflow_dispatch: {}   # можливість запустити вручну для перевірки
+
+permissions:
+  contents: write
 
 jobs:
   check-and-run:
@@ -21,8 +27,29 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      - name: Skip if not the active Kyiv schedule
+        id: gate
+        run: |
+          if [ "${{ github.event_name }}" != "schedule" ]; then
+            echo "skip=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          KYIV_HOUR=$(TZ='Europe/Kyiv' date +%H)
+          if [ "$KYIV_HOUR" = "10" ]; then
+            echo "skip=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Note skipped run
+        if: steps.gate.outputs.skip == 'true'
+        run: |
+          echo "### RC Regression Autotrigger" >> "$GITHUB_STEP_SUMMARY"
+          echo "Запуск пропущено: зараз не 10:00 за Києвом (дублікат через літній/зимовий cron)." >> "$GITHUB_STEP_SUMMARY"
+
       - name: Check Slack release channel
         id: check
+        if: steps.gate.outputs.skip != 'true'
         env:
           SLACK_BOT_TOKEN: ${{ secrets.SLACK_BOT_TOKEN }}
         run: |
@@ -60,7 +87,7 @@ jobs:
           echo "matched_text=$MATCHED_TEXT" >> "$GITHUB_OUTPUT"
 
       - name: Run regression autotests
-        if: steps.check.outputs.found == 'true'
+        if: steps.gate.outputs.skip != 'true' && steps.check.outputs.found == 'true'
         run: |
           # ЗАМІНИ на реальну команду запуску regression-автотестів, напр.:
           # pytest tests/regression --env=rc
@@ -68,9 +95,8 @@ jobs:
           # npx playwright test --grep @regression
           echo "REPLACE_WITH_YOUR_TEST_COMMAND"
 
-
       - name: Write run summary
-        if: always()
+        if: always() && steps.gate.outputs.skip != 'true'
         run: |
           echo "### RC Regression Autotrigger" >> "$GITHUB_STEP_SUMMARY"
           echo "" >> "$GITHUB_STEP_SUMMARY"
@@ -79,3 +105,37 @@ jobs:
           echo "| Час перевірки (UTC) | $(date -u '+%Y-%m-%d %H:%M:%S') |" >> "$GITHUB_STEP_SUMMARY"
           echo "| Релізне повідомлення знайдено | ${{ steps.check.outputs.found }} |" >> "$GITHUB_STEP_SUMMARY"
           echo "| Текст повідомлення | ${{ steps.check.outputs.matched_text }} |" >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Update STATUS.md
+        if: always() && steps.gate.outputs.skip != 'true'
+        run: |
+          DATE=$(date -u '+%Y-%m-%d')
+          TIME=$(date -u '+%H:%M:%S')
+          FOUND="${{ steps.check.outputs.found }}"
+          TEXT="${{ steps.check.outputs.matched_text }}"
+          # Прибираємо переноси рядків і escape'имо "|", щоб не зламати markdown-таблицю
+          TEXT=$(echo "$TEXT" | tr '\n' ' ' | sed 's/|/\\|/g')
+
+          if [ ! -f STATUS.md ]; then
+            {
+              echo "# RC Regression Autotrigger — Status"
+              echo ""
+              echo "| Дата | Час (UTC) | Команду знайдено | Текст повідомлення |"
+              echo "|---|---|---|---|"
+            } > STATUS.md
+          fi
+
+          echo "| ${DATE} | ${TIME} | ${FOUND} | ${TEXT} |" >> STATUS.md
+
+      - name: Commit and push STATUS.md
+        if: always() && steps.gate.outputs.skip != 'true'
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add STATUS.md
+          if git diff --cached --quiet; then
+            echo "Немає змін у STATUS.md"
+          else
+            git commit -m "Update STATUS.md after regression check run"
+            git push origin HEAD:main
+          fi
