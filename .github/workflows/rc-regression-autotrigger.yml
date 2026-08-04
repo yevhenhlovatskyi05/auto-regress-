@@ -131,6 +131,14 @@ jobs:
           echo "| Релізне повідомлення знайдено | ${{ steps.check.outputs.found }} |" >> "$GITHUB_STEP_SUMMARY"
           echo "| Текст повідомлення | ${{ steps.check.outputs.matched_text }} |" >> "$GITHUB_STEP_SUMMARY"
 
+          AUTOTEST_STATUS="${{ steps.autotests.outputs.status }}"
+          if [ -n "$AUTOTEST_STATUS" ]; then
+            echo "| Автотести | ${AUTOTEST_STATUS} |" >> "$GITHUB_STEP_SUMMARY"
+            echo "| Підсумок автотестів | ${{ steps.autotests.outputs.summary }} |" >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "| Автотести | не запускались (Slack-повідомлення не знайдено і запуск не ручний) |" >> "$GITHUB_STEP_SUMMARY"
+          fi
+
       - name: Update STATUS.md
         if: always() && steps.gate.outputs.skip != 'true'
         run: |
