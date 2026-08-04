@@ -14,10 +14,10 @@
   Коли автотести буде додано в "Run regression autotests" в workflow, зроби кнопку клікабельною,
   замінивши блок нижче на:
 
-  [![Run autotest](https://img.shields.io/badge/Run%20autotest-brightgreen?style=for-the-badge)](https://github.com/yevhenhlovatskyi05/auto-regress-/actions/workflows/rc-regression-autotrigger.yml)
+  [![Run autotest](https://img.shields.io/badge/Run%20autotest-2ea44f?style=flat&labelColor=2ea44f)](https://github.com/yevhenhlovatskyi05/auto-regress-/actions/workflows/rc-regression-autotrigger.yml)
 
   (клік відкриє сторінку Actions, де можна запустити workflow_dispatch вручну)
 -->
-![Run autotest](https://img.shields.io/badge/Run%20autotest-lightgrey?style=for-the-badge)
+![Run autotest](https://img.shields.io/badge/Run%20autotest-lightgrey?style=flat)
 
 </div>
