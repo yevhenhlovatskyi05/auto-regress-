@@ -9,12 +9,13 @@ name: RC Regression Autotrigger
 
 on:
   schedule:
-    # Ціль - 10:00 за Києвом. GitHub Actions cron рахує тільки в UTC і не знає про
-    # перехід на літній/зимовий час, тому нижче два cron-рядки (на обидва зсуви),
-    # а крок "Skip if not the active Kyiv schedule" відкидає той запуск, який
-    # не відповідає поточному київському часу, щоб job не виконувався двічі на день.
-    - cron: '0 7 * * 1-5'   # 10:00 Kyiv влітку (UTC+3)
-    - cron: '0 8 * * 1-5'   # 10:00 Kyiv взимку (UTC+2)
+    # Ціль - приблизно 10:00 за Києвом. GitHub Actions cron рахує тільки в UTC,
+    # не знає про перехід на літній/зимовий час, і НЕ гарантує точний час запуску
+    # (можливі затримки на години під навантаженням) - тому нижче два cron-рядки
+    # (на обидва зсуви) як стартовий сигнал, а gate-крок нижче приймає широке вікно
+    # 9:00-14:00 Kyiv і пропускає повторне спрацювання того ж дня через службовий файл.
+    - cron: '0 7 * * 1-5'   # орієнтовно 10:00 Kyiv влітку (UTC+3)
+    - cron: '0 8 * * 1-5'   # орієнтовно 10:00 Kyiv взимку (UTC+2)
   workflow_dispatch: {}   # можливість запустити вручну для перевірки
 
 permissions:
@@ -32,25 +33,40 @@ jobs:
         with:
           python-version: '3.12'
 
-      - name: Skip if not the active Kyiv schedule
+      - name: Skip if already checked today via schedule
         id: gate
         run: |
           if [ "${{ github.event_name }}" != "schedule" ]; then
             echo "skip=false" >> "$GITHUB_OUTPUT"
             exit 0
           fi
+
           KYIV_HOUR=$(TZ='Europe/Kyiv' date +%H)
-          if [ "$KYIV_HOUR" = "10" ]; then
-            echo "skip=false" >> "$GITHUB_OUTPUT"
-          else
+          KYIV_DATE=$(TZ='Europe/Kyiv' date +%Y-%m-%d)
+
+          # GitHub не гарантує точний час schedule-запуску (реальні затримки в кілька
+          # годин - норма), тому замість "рівно 10:00" приймаємо широке вікно.
+          if [ "$KYIV_HOUR" -lt 9 ] || [ "$KYIV_HOUR" -gt 14 ]; then
             echo "skip=true" >> "$GITHUB_OUTPUT"
+            echo "reason=поза вікном 9:00-14:00 Kyiv (зараз ${KYIV_HOUR}:00)" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          # Захист від подвійного спрацювання (два cron-рядки на літній/зимовий час
+          # можуть обидва потрапити у вікно під затримкою) - перевіряємо службовий файл.
+          LAST_CHECK=$(cat .github/last-scheduled-check.txt 2>/dev/null || true)
+          if [ "$LAST_CHECK" = "$KYIV_DATE" ]; then
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+            echo "reason=сьогоднішня (${KYIV_DATE}) schedule-перевірка вже виконана раніше" >> "$GITHUB_OUTPUT"
+          else
+            echo "skip=false" >> "$GITHUB_OUTPUT"
           fi
 
       - name: Note skipped run
         if: steps.gate.outputs.skip == 'true'
         run: |
           echo "### RC Regression Autotrigger" >> "$GITHUB_STEP_SUMMARY"
-          echo "Запуск пропущено: зараз не 10:00 за Києвом (дублікат через літній/зимовий cron)." >> "$GITHUB_STEP_SUMMARY"
+          echo "Запуск пропущено: ${{ steps.gate.outputs.reason }}." >> "$GITHUB_STEP_SUMMARY"
 
       - name: Check Slack release channel
         id: check
@@ -146,7 +162,7 @@ jobs:
           git config user.email "github-actions[bot]@users.noreply.github.com"
 
           NOW_EPOCH=$(date +%s)
-          DATE=$(date -u -d "@${NOW_EPOCH}" '+%Y-%m-%d')
+          DATE=$(TZ='Europe/Kyiv' date -d "@${NOW_EPOCH}" '+%Y-%m-%d')
           KYIV_TIME=$(TZ='Europe/Kyiv' date -d "@${NOW_EPOCH}" '+%H:%M:%S')
           FOUND="${{ steps.check.outputs.found }}"
           TEXT="${{ steps.check.outputs.matched_text }}"
@@ -201,7 +217,16 @@ jobs:
               } >> STATUS.md
             fi
 
-            git add STATUS.md
+            # Службовий файл "коли востаннє реально виконувалась schedule-перевірка" -
+            # gate-крок читає його, щоб не спрацювати вдруге того ж дня при затримці.
+            # Окремий файл, а не коментар у самому STATUS.md, щоб нічого зайвого
+            # не потрапляло у видиму частину документа.
+            if [ "${{ github.event_name }}" = "schedule" ]; then
+              mkdir -p .github
+              echo "$DATE" > .github/last-scheduled-check.txt
+            fi
+
+            git add STATUS.md .github/last-scheduled-check.txt 2>/dev/null || git add STATUS.md
             if git diff --cached --quiet; then
               echo "Немає змін у STATUS.md"
               PUSHED=true
