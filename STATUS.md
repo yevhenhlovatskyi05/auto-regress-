@@ -15,6 +15,7 @@
 | 11 | 2026-08-13 | 11:22:17 | false |   |
 | 12 | 2026-08-14 | 11:17:04 | false |   |
 | 13 | 2026-08-17 | 10:53:58 | false |   |
+| 14 | 2026-08-18 | 10:39:08 | false |   |
 
 [![Run autotest](data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIxMzAiIGhlaWdodD0iMzIiIHZpZXdCb3g9IjAgMCAxMzAgMzIiPgogIDxyZWN0IHdpZHRoPSIxMzAiIGhlaWdodD0iMzIiIHJ4PSI0IiBmaWxsPSIjMDBCRDZFIi8+CiAgPHRleHQgeD0iNjUiIHk9IjIwIiBmb250LWZhbWlseT0iUm9ib3RvLCBBcmlhbCwgc2Fucy1zZXJpZiIgZm9udC1zaXplPSIxNCIgZmlsbD0iI0ZGRkZGRiIgdGV4dC1hbmNob3I9Im1pZGRsZSI+UnVuIGF1dG90ZXN0PC90ZXh0Pgo8L3N2Zz4K)](https://github.com/yevhenhlovatskyi05/auto-regress-/actions/workflows/rc-regression-autotrigger.yml)
 
