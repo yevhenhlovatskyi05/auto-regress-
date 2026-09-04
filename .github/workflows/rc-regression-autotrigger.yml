@@ -221,9 +221,14 @@ jobs:
             else
               LAST_LINE=$(grep -n '^| [0-9][0-9]* |' STATUS.md | tail -1 | cut -d: -f1 || true)
               LAST_NUM=$(grep -n '^| [0-9][0-9]* |' STATUS.md | tail -1 | sed -E 's/^[0-9]+:\| *([0-9]+) .*/\1/' || true)
+              # Якщо в таблиці ще немає жодного рядка з даними (лише заголовок) -
+              # вставляємо одразу після розділювача "|---|", а не покладаємось на
+              # LAST_LINE (який був би 0 і тихо "загубив" би перший рядок).
+              SEP_LINE=$(grep -n '^|---|---|---|---|---|$' STATUS.md | head -1 | cut -d: -f1 || true)
+              INSERT_AFTER="${LAST_LINE:-$SEP_LINE}"
               NEXT=$(( ${LAST_NUM:-0} + 1 ))
               NEW_ROW="| ${NEXT} | ${DATE} | ${KYIV_TIME} | ${FOUND} | ${TEXT} |"
-              awk -v line="${LAST_LINE:-0}" -v newrow="$NEW_ROW" 'NR==line{print; print newrow; next}{print}' STATUS.md > STATUS.md.tmp
+              awk -v line="${INSERT_AFTER:-0}" -v newrow="$NEW_ROW" 'NR==line{print; print newrow; next}{print}' STATUS.md > STATUS.md.tmp
               mv STATUS.md.tmp STATUS.md
             fi
 
