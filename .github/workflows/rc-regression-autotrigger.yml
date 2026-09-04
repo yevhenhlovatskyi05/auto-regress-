@@ -76,11 +76,20 @@ jobs:
 
           OK=$(echo "$RESPONSE" | jq -r '.ok')
           if [ "$OK" != "true" ]; then
-            echo "Slack API error: $(echo "$RESPONSE" | jq -r '.error')"
+            ERROR_MSG=$(echo "$RESPONSE" | jq -r '.error // "unknown"')
+            echo "Slack API error: $ERROR_MSG"
             echo "found=false" >> "$GITHUB_OUTPUT"
             echo "matched_text=" >> "$GITHUB_OUTPUT"
+            echo "error=$ERROR_MSG" >> "$GITHUB_OUTPUT"
+            echo "message_count=" >> "$GITHUB_OUTPUT"
             exit 0
           fi
+
+          # Скільки повідомлень реально повернув Slack за цей проміжок - якщо колись
+          # тут буде 0 при тому, що повідомлення точно було, або підозріло мало при
+          # активному каналі - це підказка на пагінацію/обмеження API, а не на баг keyword-пошуку.
+          MSG_COUNT=$(echo "$RESPONSE" | jq '.messages | length')
+          echo "Отримано повідомлень від Slack: $MSG_COUNT"
 
           KEYWORDS=("start regress to RC")
           FOUND="false"
@@ -100,6 +109,8 @@ jobs:
 
           echo "found=$FOUND" >> "$GITHUB_OUTPUT"
           echo "matched_text=$MATCHED_TEXT" >> "$GITHUB_OUTPUT"
+          echo "error=" >> "$GITHUB_OUTPUT"
+          echo "message_count=$MSG_COUNT" >> "$GITHUB_OUTPUT"
 
       - name: Run regression autotests
         id: autotests
@@ -140,6 +151,10 @@ jobs:
           echo "| Час перевірки (UTC) | $(date -u '+%Y-%m-%d %H:%M:%S') |" >> "$GITHUB_STEP_SUMMARY"
           echo "| Релізне повідомлення знайдено | ${{ steps.check.outputs.found }} |" >> "$GITHUB_STEP_SUMMARY"
           echo "| Текст повідомлення | ${{ steps.check.outputs.matched_text }} |" >> "$GITHUB_STEP_SUMMARY"
+          echo "| Отримано повідомлень від Slack | ${{ steps.check.outputs.message_count }} |" >> "$GITHUB_STEP_SUMMARY"
+          if [ -n "${{ steps.check.outputs.error }}" ]; then
+            echo "| Slack API помилка | ${{ steps.check.outputs.error }} |" >> "$GITHUB_STEP_SUMMARY"
+          fi
 
           AUTOTEST_STATUS="${{ steps.autotests.outputs.status }}"
           if [ -n "$AUTOTEST_STATUS" ]; then
