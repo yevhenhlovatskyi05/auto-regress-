@@ -2,35 +2,5 @@
 
 | № | Дата | Час (Kyiv) | Команду знайдено | Текст повідомлення |
 |---|---|---|---|---|
-| 1 | 2026-07-30 | 12:25:31 | true | @Eugene Glovatskiy please start regress to RC |
-| 2 | 2026-08-04 | 23:38:54 | false | |
-| 3 | 2026-08-04 | 01:05:32 | false |   |
-| 4 | 2026-08-04 | 01:25:20 | false |   |
-| 5 | 2026-08-05 | 20:04:52 | false | |
-| 6 | 2026-08-06 | 12:41:03 | false |   |
-| 7 | 2026-08-07 | 11:15:31 | false |   |
-| 8 | 2026-08-10 | 11:27:55 | false |   |
-| 9 | 2026-08-11 | 11:09:52 | false |   |
-| 10 | 2026-08-12 | 11:19:15 | false |   |
-| 11 | 2026-08-13 | 11:22:17 | false |   |
-| 12 | 2026-08-14 | 11:17:04 | false |   |
-| 13 | 2026-08-17 | 10:53:58 | false |   |
-| 14 | 2026-08-18 | 10:39:08 | false |   |
-| 15 | 2026-08-19 | 10:39:18 | false |   |
-| 16 | 2026-08-20 | 10:41:48 | false |   |
-| 17 | 2026-08-21 | 10:43:44 | false |   |
-| 18 | 2026-08-24 | 10:58:36 | false |   |
-| 19 | 2026-08-25 | 10:44:48 | false |   |
-| 20 | 2026-08-26 | 10:48:21 | false |   |
-| 21 | 2026-09-02 | 14:59:00 | false |   |
-| 22 | 2026-09-03 | 14:58:39 | false |   |
 
 [![Run autotest](data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIxMzAiIGhlaWdodD0iMzIiIHZpZXdCb3g9IjAgMCAxMzAgMzIiPgogIDxyZWN0IHdpZHRoPSIxMzAiIGhlaWdodD0iMzIiIHJ4PSI0IiBmaWxsPSIjMDBCRDZFIi8+CiAgPHRleHQgeD0iNjUiIHk9IjIwIiBmb250LWZhbWlseT0iUm9ib3RvLCBBcmlhbCwgc2Fucy1zZXJpZiIgZm9udC1zaXplPSIxNCIgZmlsbD0iI0ZGRkZGRiIgdGV4dC1hbmNob3I9Im1pZGRsZSI+UnVuIGF1dG90ZXN0PC90ZXh0Pgo8L3N2Zz4K)](https://github.com/yevhenhlovatskyi05/auto-regress-/actions/workflows/rc-regression-autotrigger.yml)
-
-
-## Останній запуск автотестів
-
-- Статус: ✅ passed
-- Час: 2026-08-04 01:25:20 (Kyiv)
-- Підсумок: ============================== 2 passed in 11.07s ============================== 
-- [Повний лог запуску](https://github.com/yevhenhlovatskyi05/auto-regress-/actions/runs/30956273514)
